@@ -40,13 +40,16 @@ object Crawler {
   }
 
   def extractText(doc: Document): String = {
-    doc.text()
+    if(doc.select("#contentMain").text.length > 100) {
+      return doc.select("#contentMain").text
+    }
+    return doc.text
   }
 
   class CrawlerThread(id: Int) extends Runnable {
 
     def run {
-      while (queue.nonEmpty && linkContent.size < 1000) {
+      while (queue.nonEmpty && linkContent.size < 1500) {
         var url = ""
         synchronized {
           url = queue.dequeue()
@@ -103,6 +106,9 @@ object Crawler {
 
   def main(args: Array[String]) {
 
+//    var a = fetchDocumentFromURL("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en/studies/non-degree-courses/exchange-and-visiting-studies/programmes.html")
+//    println(extractText(a).length, extractText(a))
+
     var seed = "http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html"
     bfsFromSeed(seed)
     println(linkContent.size)
@@ -110,7 +116,7 @@ object Crawler {
     var ls = linkContent.keys.toList zip linkContent.values.map(x => SimHash128.getCodeOfDocument(x, 5))
     println("Starting comparison")
     for (d1 <- ls; d2 <- ls) {
-      if (d1._1 != d2._1 && SimHash128.compareCodes(d1._2, d2._2) > 124) {
+      if (d1._1 != d2._1 && SimHash128.compareCodes(d1._2, d2._2) > 120) {
         println(SimHash128.compareCodes(d1._2, d2._2), " ", d1._1, " ", d2._1)
       }
     }

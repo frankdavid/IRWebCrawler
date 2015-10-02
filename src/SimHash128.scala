@@ -12,8 +12,9 @@ object SimHash128 {
   def getCodeOfDocument(doc: String, shingleSize: Int): Array[Boolean] = {
 //    var words = Tokenizer.tokenize(doc)
     val values = Array.fill[Int](128)(0)
-    for (shingle <- doc.sliding(shingleSize)) {
-      val code = getCodeOfShingle(List(shingle))
+    val docSplit = Tokenizer.tokenize(doc)
+    for (shingle <- docSplit.sliding(shingleSize)) {
+      val code = getCodeOfShingle(shingle)
       for (i <- 0 to 127) {
         if ( (code(i>>3) & (i&7)) > 0) {
           values(i) = values(i) + 1
@@ -36,7 +37,7 @@ object SimHash128 {
 
   def main(args: Array[String]) {
 
-    println(similarity("alma korte szilva", "korte alma szilva", 5))
+    println(similarity("Singapore may hold the dubious title of “most expensive city in the world,” but it remains the most popular place for expats to live and work, according to an annual survey of expats released by HSBC.", "Singapore may hold the dubious title of “most expensive city in the world,” but       dfgsdfg sdgbsd bfd sb bsdb vs bv   it remains the most popular place for expats to live and work, eccording to an annual survey of expats released by HSBC.", 5))
 
 
   }

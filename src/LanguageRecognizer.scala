@@ -1,4 +1,5 @@
-import java.io.PrintWriter
+import java.io.{FileOutputStream, OutputStreamWriter, BufferedWriter, PrintWriter}
+import java.util.Locale
 
 import scala.collection.mutable.Map
 
@@ -34,18 +35,19 @@ object LanguageRecognizer {
 
     def writeToFile(f: String) = {
 
-      val pw = new PrintWriter(f);
+      val pw = new PrintWriter(new OutputStreamWriter(
+        new FileOutputStream(f), "UTF-8"));
 
-      pw.println("%.30f".format(normFactor));
-      pw.println(win);
+      pw.println("%.30f".format(normFactor))
+      pw.println(win)
       frequencyMap.foreach(p => pw.println(p._1 + "," + "%.30f".format(p._2)))
 
-      pw.close();
+      pw.close()
     }
 
     def readFromFile(f: String) = {
 
-      val lines = scala.io.Source.fromFile(f).getLines().toList
+      val lines = scala.io.Source.fromFile(f, "UTF-8").getLines().toList
 
       normFactor = lines(0).toDouble
       win = lines(1).toInt
@@ -59,7 +61,7 @@ object LanguageRecognizer {
 
     val dir = "data/lang/"
 
-    /*Locale.setDefault(new Locale("en", "US"));
+    Locale.setDefault(new Locale("en", "US"));
 
     val eng = new NgramFrequencies()
     eng.process(dir + "1.en", 3)
@@ -94,7 +96,7 @@ object LanguageRecognizer {
     println(test.frequencyMap.filter { case (key, value) => eng.frequencyMap.getOrElse(key, -1.0) != value})
 
     println(statTest)
-    println(statTest._2 / statTest._1)*/
+    println(statTest._2 / statTest._1)
 
     val en = new NgramFrequencies
     val de = new NgramFrequencies
