@@ -57,7 +57,7 @@ object LanguageRecognizer {
 
   def main (args: Array[String]) {
 
-    val dir = "/data/lang/"
+    val dir = "data/lang/"
 
     /*Locale.setDefault(new Locale("en", "US"));
 
