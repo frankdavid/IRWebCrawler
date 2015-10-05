@@ -1,17 +1,21 @@
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListSet, LinkedBlockingQueue}
+
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
 import scala.collection.JavaConversions._
-import scala.collection.mutable
+import scala.collection.parallel.mutable.ParHashMap
 
 
 object Crawler {
 
   var seedUrl: String = "http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/"
-  var visitedUrls: mutable.Set[String] = mutable.Set()
-  var enquedUrls: mutable.Set[String] = mutable.Set[String]()
-  var queue: mutable.Queue[String] = mutable.Queue[String]()
-  var linkContent: mutable.Map[String, String] = mutable.Map[String, String]()
+  var visitedUrls = new ConcurrentSkipListSet[String]()
+  var enquedUrls = new ConcurrentSkipListSet[String]()
+  var queue = new LinkedBlockingQueue[String]()
+  var linkContent = new ConcurrentHashMap[String, String]()
+
+  val exceptionCount = new ParHashMap[String, Int]()
 
   def filterURLList(url_list: List[String]): Set[String] = {
 
@@ -21,8 +25,9 @@ object Crawler {
     url_list_normalized = url_list_normalized.map(x => x.replaceAll("\\?.*", ""))
 
     //sort unsupported ends
-    url_list_normalized = url_list_normalized.filter(x => x.endsWith(".html") || (!x.endsWith(".png") &&
-      !x.endsWith(".jpg") && !x.endsWith(".pdf") && !x.endsWith("doc") && !x.endsWith(".docx")))
+    url_list_normalized = url_list_normalized.filter(x => x.matches(".*(\\.html?|\\/[^\\/\\.]*)$"))
+//    url_list_normalized = url_list_normalized.filter(x => (!x.endsWith(".png") &&
+//      !x.endsWith(".jpg") && !x.endsWith(".pdf") && !x.endsWith("doc") && !x.endsWith(".docx")))
 
 
     //filter out url pointing to outside
@@ -35,7 +40,7 @@ object Crawler {
   }
 
   def fetchDocumentFromURL(url: String): Document = {
-    return Jsoup.connect(url).timeout(60 * 1000).get()
+    return Jsoup.connect(url).timeout(5000).get()
     //    return Jsoup.parse(Source.fromURL(url).mkString)
   }
 
@@ -49,34 +54,31 @@ object Crawler {
   class CrawlerThread(id: Int) extends Runnable {
 
     def run {
-      while (queue.nonEmpty && linkContent.size < 1500) {
-        var url = ""
-        synchronized {
-          url = queue.dequeue()
-        }
+      while (queue.nonEmpty) {
+        val url = queue.poll()
         try {
           var doc = fetchDocumentFromURL(url)
           //println(id, visitedUrls.size, queue.size, url)
 
           linkContent(url) = Normalizer.normalize(extractText(doc))
 
-          synchronized {
-            visitedUrls.add(url)
+            visitedUrls += url
             if (visitedUrls.size % 100 == 0) {
               println(visitedUrls.size, queue.size)
             }
-          }
           for (url <- getURLsFromDoc(doc).filter(x => !enquedUrls.contains(x))) {
-            synchronized {
-              queue.enqueue(url)
-              enquedUrls.add(url)
-            }
+              queue.add(url)
+              enquedUrls += url
           }
         }
         catch {
-          case e1: org.jsoup.UnsupportedMimeTypeException => if (!url.endsWith(".png") && !url.endsWith(".pdf")) println("Could not read url " + url)
-          case e2: org.jsoup.HttpStatusException => println("Status exception " + url)
-          case e: Exception => println("BAAD", e.getMessage, url)
+          case e: org.jsoup.HttpStatusException =>
+            val message = "status" + e.getStatusCode
+            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+          case e: Throwable =>
+            e.printStackTrace()
+            val message = e.getClass.getName + " " + e.getMessage
+            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
         }
 
       }
@@ -87,20 +89,17 @@ object Crawler {
 
   def bfsFromSeed(seed: String): Unit = {
 
-    queue.enqueue(seed)
-    enquedUrls.add(seed)
-    var threads = mutable.MutableList[Thread]()
-    for (i <- 1 to 1) {
-      var t: Thread = new Thread(new CrawlerThread(i))
-      threads += t
-      t.start
+    queue.add(seed)
+    enquedUrls += seed
+    val threads = for(i <- 1 to 10) yield {
+      val t = new Thread(new CrawlerThread(i))
+      t.start()
       Thread.sleep(1000)
+      t
     }
-    for (t <- threads) {
-      t.join()
-    }
+    threads.foreach(_.join())
 
-
+    println(exceptionCount)
   }
 
 
@@ -113,13 +112,13 @@ object Crawler {
     bfsFromSeed(seed)
     println(linkContent.size)
 
-    var ls = linkContent.keys.toList zip linkContent.values.map(x => SimHash128.getCodeOfDocument(x, 5))
-    println("Starting comparison")
-    for (d1 <- ls; d2 <- ls) {
-      if (d1._1 != d2._1 && SimHash128.compareCodes(d1._2, d2._2) > 120) {
-        println(SimHash128.compareCodes(d1._2, d2._2), " ", d1._1, " ", d2._1)
-      }
-    }
+//    var ls = linkContent.keys.toList zip linkContent.values.map(x => SimHash128.getCodeOfDocument(x, 5))
+//    println("Starting comparison")
+//    for (d1 <- ls; d2 <- ls) {
+//      if (d1._1 != d2._1 && SimHash128.compareCodes(d1._2, d2._2) > 120) {
+//        println(SimHash128.compareCodes(d1._2, d2._2), " ", d1._1, " ", d2._1)
+//      }
+//    }
 
     //    val simhash = SimHash
     //
