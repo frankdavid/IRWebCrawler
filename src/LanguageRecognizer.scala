@@ -1,14 +1,18 @@
 import java.io.File
 import java.util.Locale
 
-class LanguageRecognizer(scorers: Map[Locale, LanguageScorer]) {
-  def recognize(string: String) = {
-    scorers.maxBy {scorer => scorer._2.score(string)}._1
+class LanguageRecognizer(scorers: Seq[LanguageScorer]) {
+
+  require(scorers.nonEmpty)
+
+  def recognize(string: String): Locale = {
+    scorers.maxBy(_.score(string)).language
   }
 }
 
 object LanguageRecognizer {
-  def fromFiles(files: Map[Locale, File]) = {
-    files.mapValues(LanguageScorer.readFromFile)
+
+  def fromFiles(files: Seq[File]): LanguageRecognizer = {
+    new LanguageRecognizer(files.map(LanguageScorer.deserialize))
   }
 }
