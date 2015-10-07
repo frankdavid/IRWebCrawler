@@ -1,15 +1,16 @@
+import java.net.SocketTimeoutException
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListSet, LinkedBlockingQueue}
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.parallel.mutable.ParHashMap
 
 
-object Crawler {
+class Crawler(seedUrl: String) {
 
-  val seedUrl: String = "http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/"
   val visitedUrls = new ConcurrentSkipListSet[String]()
   val enqueuedUrls = new ConcurrentSkipListSet[String]()
   val inProgress = new ConcurrentSkipListSet[String]()
@@ -17,13 +18,20 @@ object Crawler {
   val linkContent = new ConcurrentHashMap[String, String]()
   val exceptionCount = new ParHashMap[String, Int]()
 
+  /** Example: http://idvm-infk-hofmann03.inf.ethz.ch */
+  val crawlDomain = {
+    val regex = """^(.*:\/\/[^\/]+)\/.*""".r
+    val regex(domain) = seedUrl
+    domain
+  }
+
   def normalizeAndFilterURLList(urlList: List[String]): Set[String] = {
     urlList
-        .map(x => x.replaceAll("#.*", ""))
-        .map(x => x.replaceAll("\\?.*", "")) 
-        .filter(x => x.matches(".*(\\.html?|\\/[^\\/\\.]*)(\\?.*)?$")) //sort unsupported ends
-        .filter(x => x.startsWith(seedUrl)) //filter out url pointing to outside
-        .filter(x => !x.contains("/login"))
+        .map(_.replaceAll("#.*", ""))
+        .map(_.replaceAll("\\?.*", ""))
+        .filter(_.matches(".*(\\.html?|\\/[^\\/\\.]*)$")) //sort unsupported ends
+        .filter(_.startsWith(crawlDomain)) //filter out url pointing to outside
+        .filter(!_.contains("/login"))
         .toSet
   }
 
@@ -46,55 +54,58 @@ object Crawler {
 
   class CrawlerThread(id: Int) extends Thread {
 
-    override def run(): Unit = {
-        val url = Crawler.this.synchronized {
-          val url = queue.poll()
-          if (url != null) {
-            inProgress.add(url)
-          }
-          url
+    @tailrec
+    final override def run(): Unit = {
+      val url = inProgress.synchronized {
+        val url = queue.poll()
+        if (url != null) {
+          inProgress.add(url)
         }
-        if (url == null) {
-          if (inProgress.size() > 0) {
-            Thread.sleep(200)
-            run()
-          }
-        } else {
-          try {
-            val doc = fetchDocumentFromURL(url)
-            //println(id, visitedUrls.size, queue.size, url)
-
-            linkContent(url) = Normalizer.normalize(extractText(doc))
-
-            visitedUrls += url
-            if (visitedUrls.size % 100 == 0) {
-              println(visitedUrls.size, queue.size)
-            }
-            for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
-              queue.add(url)
-              enqueuedUrls += url
-            }
-          }
-          catch {
-            case e: org.jsoup.HttpStatusException =>
-              val message = "status" + e.getStatusCode
-              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-            case e: Throwable =>
-              e.printStackTrace()
-              val message = e.getClass.getName + " " + e.getMessage
-              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-          }
-          inProgress -= url
+        url
+      }
+      if (url == null) {
+        if (inProgress.size() > 0) {
+          Thread.sleep(200)
           run()
         }
+      } else {
+        try {
+          val doc = fetchDocumentFromURL(url)
+          //println(id, visitedUrls.size, queue.size, url)
+
+          linkContent(url) = Normalizer.normalize(extractText(doc))
+
+          visitedUrls += url
+          if (visitedUrls.size % 100 == 0) {
+            println(visitedUrls.size, queue.size)
+          }
+          for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
+            queue.add(url)
+            enqueuedUrls += url
+          }
+        }
+        catch {
+          case e: org.jsoup.HttpStatusException =>
+            val message = "status" + e.getStatusCode
+            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+          case _: SocketTimeoutException =>
+            queue.add(url)
+          case e: Throwable =>
+            e.printStackTrace()
+            val message = e.getClass.getName + " " + e.getMessage
+            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+        }
+        inProgress -= url
+        run()
       }
+    }
   }
 
 
-  def bfsFromSeed(seed: String): Unit = {
-    queue.add(seed)
-    enqueuedUrls += seed
-    val threads = for(i <- 1 to 30) yield {
+  def crawl(): Unit = {
+    queue.add(seedUrl)
+    enqueuedUrls += seedUrl
+    val threads = for (i <- 1 to 80) yield {
       val t = new CrawlerThread(i)
       t.start()
       t
@@ -103,16 +114,18 @@ object Crawler {
 
     println(exceptionCount)
   }
+}
 
-
+object Crawler {
   def main(args: Array[String]) {
 
 //    var a = fetchDocumentFromURL("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en/studies/non-degree-courses/exchange-and-visiting-studies/programmes.html")
 //    println(extractText(a).length, extractText(a))
 
     val seed = args.headOption.getOrElse("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html")
-    bfsFromSeed(seed)
-    println(linkContent.size)
+    val crawler = new Crawler(seed)
+    crawler.crawl()
+    println(crawler.linkContent.size)
 
 //    var ls = linkContent.keys.toList zip linkContent.values.map(x => SimHash128.getCodeOfDocument(x, 5))
 //    println("Starting comparison")
