@@ -20,9 +20,10 @@ object Crawler {
   def normalizeAndFilterURLList(urlList: List[String]): Set[String] = {
     urlList
         .map(x => x.replaceAll("#.*", ""))
-//        .map(x => x.replaceAll("\\?.*", "")) //TODO investigate this lines influence on neighbours
+        .map(x => x.replaceAll("\\?.*", "")) 
         .filter(x => x.matches(".*(\\.html?|\\/[^\\/\\.]*)(\\?.*)?$")) //sort unsupported ends
         .filter(x => x.startsWith(seedUrl)) //filter out url pointing to outside
+        .filter(x => !x.contains("/login"))
         .toSet
   }
 
@@ -36,8 +37,8 @@ object Crawler {
   }
 
   def extractText(doc: Document): String = {
-    if(doc.select("#contentMain").text.length > 100) {
-      doc.select("#contentMain").text
+    if(doc.select("#contentMain, .textList").text.length > 10) {
+      doc.select("#contentMain, .textList").text
     } else {
       doc.text
     }
