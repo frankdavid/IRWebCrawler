@@ -109,7 +109,7 @@ object Crawler {
 //    var a = fetchDocumentFromURL("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en/studies/non-degree-courses/exchange-and-visiting-studies/programmes.html")
 //    println(extractText(a).length, extractText(a))
 
-    val seed = "http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html"
+    val seed = args.headOption.getOrElse("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html")
     bfsFromSeed(seed)
     println(linkContent.size)
 
