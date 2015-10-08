@@ -13,7 +13,7 @@ object LanguageRecognizerTest {
       new File(dir + "frequencies_en.dat"),
       new File(dir + "frequencies_de.dat")))
 
-    val file = Source.fromFile(dir + "sentences.txt")
+    val file = Source.fromFile(dir + "sentences.txt", "UTF-8")
 
     file.getLines().foreach { line =>
       val lang = recognizer.recognize(line)

@@ -12,11 +12,11 @@ object LanguageScorerTest {
 
     val german = LanguageScorer.trainFromText(Locale.GERMAN, new File(dir + "1.de"), 3)
 
-    val statGer = Source.fromFile(dir + "top10000de.txt").getLines()
+    val statGer = Source.fromFile(dir + "top10000de.txt", "UTF-8").getLines()
         .filter(_.length > 3).foldLeft((0.0, 0.0))((t, line) =>
       (t._1 + 1, if (german.score(line) > english.score(line)) t._2 + 1 else t._2))
 
-    val statEng = Source.fromFile(dir + "top10000en.txt").getLines()
+    val statEng = Source.fromFile(dir + "top10000en.txt", "UTF-8").getLines()
         .filter(_.length > 3).foldLeft((0.0, 0.0))((t, line) =>
       (t._1 + 1, if (german.score(line) < english.score(line)) t._2 + 1 else t._2))
 
@@ -28,7 +28,7 @@ object LanguageScorerTest {
 
     val test = LanguageScorer.deserialize(new File(dir + "frequencies_en.dat"))
 
-    val statTest = Source.fromFile(dir + "top10000en.txt").getLines()
+    val statTest = Source.fromFile(dir + "top10000en.txt", "UTF-8").getLines()
         .filter(_.length > 3).foldLeft((0.0, 0.0))((t, line) =>
       (t._1 + 1, if (german.score(line) < test.score(line)) t._2 + 1 else t._2))
 

@@ -34,7 +34,7 @@ object LanguageScorer {
 
   // TODO: naming of these methods??
   def deserialize(file: File): LanguageScorer = {
-    val lines = Source.fromFile(file).getLines().toList
+    val lines = Source.fromFile(file, "UTF-8").getLines().toList
 
     val language = Locale.forLanguageTag(lines(0))
     val normFactor = lines(1).toDouble
@@ -50,7 +50,7 @@ object LanguageScorer {
   def trainFromText(language: Locale, file: File, windowSize: Int): LanguageScorer = {
     val ngramMap: mutable.Map[String, Int] = mutable.Map()
 
-    for {line <- Source.fromFile(file).getLines()
+    for {line <- Source.fromFile(file, "UTF-8").getLines()
          ngram <- line.sliding(windowSize)} {
       ngramMap(ngram) = ngramMap.getOrElse(ngram, 0) + 1
     }
