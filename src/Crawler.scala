@@ -28,9 +28,7 @@ class Crawler(seedUrl: String) {
     urlList
         .map(_.replaceAll("#.*", ""))
         .map(_.replaceAll("\\?.*", ""))
-        .filter(_.matches(".*(\\.html?|\\/[^\\/\\.]*)$")) //sort unsupported ends
-        .filter(_.startsWith(crawlDomain)) //filter out url pointing to outside
-        .filter(!_.contains("/login"))
+        .filter(url => url.endsWith(".html") && url.startsWith(crawlDomain))
         .toSet
   }
 
