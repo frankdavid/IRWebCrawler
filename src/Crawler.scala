@@ -4,7 +4,6 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListSet, LinkedBlo
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
-import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.parallel.mutable.ParHashMap
 
@@ -52,67 +51,69 @@ class Crawler(seedUrl: String) {
     }
   }
 
-  class CrawlerThread(id: Int) extends Thread {
-
-    @tailrec
-    final override def run(): Unit = {
-      val url = inProgress.synchronized {
-        val url = queue.poll()
-        if (url != null) {
-          inProgress.add(url)
-        }
-        url
-      }
-      if (url == null) {
-        if (inProgress.size() > 0) {
-          Thread.sleep(200)
-          run()
-        }
-      } else {
-        try {
-          val doc = fetchDocumentFromURL(url)
-          //println(id, visitedUrls.size, queue.size, url)
-
-          linkContent(url) = Normalizer.normalize(extractText(doc))
-
-          visitedUrls += url
-          if (visitedUrls.size % 100 == 0) {
-            println(visitedUrls.size, queue.size)
-          }
-          for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
-            queue.add(url)
-            enqueuedUrls += url
-          }
-        }
-        catch {
-          case e: org.jsoup.HttpStatusException =>
-            val message = "status" + e.getStatusCode
-            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-          case _: SocketTimeoutException =>
-            queue.add(url)
-          case e: Throwable =>
-            e.printStackTrace()
-            val message = e.getClass.getName + " " + e.getMessage
-            exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-        }
-        inProgress -= url
-        run()
-      }
-    }
+  def processPage(url: String, doc: Document) = {
+    linkContent(url) = Normalizer.normalize(extractText(doc))
   }
-
 
   def crawl(): Unit = {
     queue.add(seedUrl)
     enqueuedUrls += seedUrl
-    val threads = for (i <- 1 to 80) yield {
+    val threads = for (i <- 1 to 1) yield {
       val t = new CrawlerThread(i)
       t.start()
       t
     }
     threads.foreach(_.join())
-
     println(exceptionCount)
+  }
+
+  class CrawlerThread(id: Int) extends Thread {
+
+    override def run(): Unit = {
+      while (true) {
+        val url = inProgress.synchronized {
+          val url = queue.poll()
+          if (url != null) {
+            inProgress.add(url)
+          }
+          url
+        }
+        if (url == null) {
+          if (inProgress.isEmpty) {
+            return
+          } else {
+            Thread.sleep(200)
+          }
+        } else {
+          try {
+            val doc = fetchDocumentFromURL(url)
+            //println(id, visitedUrls.size, queue.size, url)
+
+            visitedUrls += url
+            processPage(url, doc)
+            if (visitedUrls.size % 100 == 0) {
+              println(visitedUrls.size, queue.size)
+            }
+            for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
+              queue.add(url)
+              enqueuedUrls += url
+            }
+          }
+          catch {
+            case e: org.jsoup.HttpStatusException =>
+              val message = "status" + e.getStatusCode
+              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+            case _: SocketTimeoutException =>
+              queue.add(url)
+            case e: Throwable =>
+              e.printStackTrace()
+              val message = e.getClass.getName + " " + e.getMessage
+              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+          }
+          inProgress -= url
+        }
+      }
+    }
   }
 }
 
