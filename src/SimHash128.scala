@@ -25,8 +25,7 @@ object SimHash128 {
       }
     }
 
-    (0 until 128).foldLeft(BitSet())((bitset, idx) =>
-      if (values(idx) >= 0) bitset + idx else bitset)
+    BitSet() ++ (0 until 128).filter(idx => values(idx) >= 0)
   }
 
   def compareCodes(code1: BitSet, code2: BitSet): Int = {
