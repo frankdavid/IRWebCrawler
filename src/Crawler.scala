@@ -114,7 +114,8 @@ class Crawler(seedUrl: String) {
       try {
         while (!isInterrupted) {
           Thread.sleep(1500)
-          println(s"Crawled: ${visitedUrls.size}, remaining: ${queue.size}")
+          val remaining = queue.size + inProgress.size
+          println(s"Crawled: ${visitedUrls.size}, remaining: $remaining")
         }
       } catch {
         case _: InterruptedException => // NOOP
