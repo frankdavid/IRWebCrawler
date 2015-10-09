@@ -1,4 +1,3 @@
-import java.io.File
 import java.net.{ConnectException, SocketTimeoutException}
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListSet, LinkedBlockingQueue}
@@ -13,9 +12,9 @@ import scala.collection.immutable.BitSet
 
 class Crawler(seedUrl: String) {
 
-  val languageRecognizer = LanguageRecognizer.fromFiles(Seq(
-    new File("data/lang/frequencies_de.dat"),
-    new File("data/lang/frequencies_en.dat")
+  val languageRecognizer = LanguageRecognizer.fromInputStreams(Seq(
+    FileLoader.loadFileFromPathOrJar("data/frequencies_de.dat"),
+    FileLoader.loadFileFromPathOrJar("data/frequencies_en.dat")
   ))
 
   val visitedUrls = new ConcurrentSkipListSet[String]()

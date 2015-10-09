@@ -1,19 +1,13 @@
-import java.io.File
-
 import scala.io.Source
 
 object LanguageRecognizerTest {
 
-  val dir = "data/lang/"
-
   def main(args: Array[String]): Unit = {
-    val dir = "data/lang/"
+    val recognizer = LanguageRecognizer.fromInputStreams(Seq(
+      FileLoader.loadFileFromPathOrJar("data/frequencies_en.dat"),
+      FileLoader.loadFileFromPathOrJar("data/frequencies_de.dat")))
 
-    val recognizer = LanguageRecognizer.fromFiles(Seq(
-      new File(dir + "frequencies_en.dat"),
-      new File(dir + "frequencies_de.dat")))
-
-    val file = Source.fromFile(dir + "sentences.txt", "UTF-8")
+    val file = Source.fromInputStream(FileLoader.loadFileFromPathOrJar("data/sentences.txt"), "UTF-8")
 
     file.getLines().foreach { line =>
       val lang = recognizer.recognize(line)

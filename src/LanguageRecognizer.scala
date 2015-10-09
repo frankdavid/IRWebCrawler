@@ -1,4 +1,4 @@
-import java.io.File
+import java.io.InputStream
 import java.util.Locale
 
 class LanguageRecognizer(scorers: Seq[LanguageScorer]) {
@@ -12,7 +12,7 @@ class LanguageRecognizer(scorers: Seq[LanguageScorer]) {
 
 object LanguageRecognizer {
 
-  def fromFiles(files: Seq[File]): LanguageRecognizer = {
+  def fromInputStreams(files: Seq[InputStream]): LanguageRecognizer = {
     new LanguageRecognizer(files.map(LanguageScorer.deserialize))
   }
 }

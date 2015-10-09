@@ -1,4 +1,4 @@
-import java.io.{File, PrintWriter}
+import java.io.{InputStream, File, PrintWriter}
 import java.util.Locale
 
 import scala.collection.mutable
@@ -32,9 +32,8 @@ class LanguageScorer private
 
 object LanguageScorer {
 
-  // TODO: naming of these methods??
-  def deserialize(file: File): LanguageScorer = {
-    val lines = Source.fromFile(file, "UTF-8").getLines().toList
+  def deserialize(inputStream: InputStream): LanguageScorer = {
+    val lines = Source.fromInputStream(inputStream, "UTF-8").getLines().toList
 
     val language = Locale.forLanguageTag(lines(0))
     val normFactor = lines(1).toDouble
@@ -44,13 +43,14 @@ object LanguageScorer {
       line.substring(0, windowSize) -> line.substring(windowSize + 1, line.length).toDouble
     }
 
+    inputStream.close()
     new LanguageScorer(language, frequencies.toMap, normFactor, windowSize)
   }
 
-  def trainFromText(language: Locale, file: File, windowSize: Int): LanguageScorer = {
+  def trainFromText(language: Locale, input: InputStream, windowSize: Int): LanguageScorer = {
     val ngramMap: mutable.Map[String, Int] = mutable.Map()
 
-    for {line <- Source.fromFile(file, "UTF-8").getLines()
+    for {line <- Source.fromInputStream(input, "UTF-8").getLines()
          ngram <- line.sliding(windowSize)} {
       ngramMap(ngram) = ngramMap.getOrElse(ngram, 0) + 1
     }
