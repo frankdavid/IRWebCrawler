@@ -41,11 +41,8 @@ object SimHash128 {
   }
 
   def main(args: Array[String]) {
-
     println(similarity(
       "Singapore may hold the dubious title of “most expensive city in the world,” but it remains the most popular place for expats to live and work, according to an annual survey of expats released by HSBC.",
       "Singapore may hold the dubious title of “most expensive city in the world,” but       dfgsdfg sdgbsd bfd sb bsdb vs bv   it remains the most popular place for expats to live and work, eccording to an annual survey of expats released by HSBC.", 5))
-
-
   }
 }
