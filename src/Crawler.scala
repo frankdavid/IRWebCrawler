@@ -79,7 +79,7 @@ class Crawler(seedUrl: String) {
       if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
         nearDuplicates.incrementAndGet()
       }
-      simHashes.add(currentSimHash)  // TODO: should we add the current even if we found a near duplicate?
+      simHashes.add(currentSimHash)
     }
     if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
       englishPages.incrementAndGet()
@@ -97,14 +97,30 @@ class Crawler(seedUrl: String) {
       t.start()
       t
     }
+    val loggerThread = new LoggerThread()
+    loggerThread.start()
     threads.foreach(_.join())
-    println(exceptionCount)
+    loggerThread.interrupt()
     CrawlResult(
       numDistinctUrls = visitedUrls.size,
       numExactDuplicates = exactDuplicates.get,
       numNearDuplicates = nearDuplicates.get,
       numEnglishPages = englishPages.get,
       studentFrequency = englishPagesContainingStudent.get)
+  }
+
+  class LoggerThread extends Thread {
+
+    override def run(): Unit = {
+      try {
+        while (!isInterrupted) {
+          Thread.sleep(1500)
+          println(s"Crawled: ${visitedUrls.size}, remaining: ${queue.size}")
+        }
+      } catch {
+        case _: InterruptedException => // NOOP
+      }
+    }
   }
 
   class CrawlerThread(id: Int) extends Thread {
@@ -127,13 +143,9 @@ class Crawler(seedUrl: String) {
         } else {
           try {
             val doc = fetchDocumentFromURL(url)
-            //println(id, visitedUrls.size, queue.size, url)
 
             visitedUrls += url
             processPage(url, doc)
-            if (visitedUrls.size % 100 == 0) {
-              println(visitedUrls.size, queue.size)
-            }
             for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
               queue.add(url)
               enqueuedUrls += url
@@ -148,7 +160,6 @@ class Crawler(seedUrl: String) {
             case _: SocketTimeoutException =>
               queue.add(url)
             case e: Throwable =>
-              e.printStackTrace()
               val message = e.getClass.getName + " " + e.getMessage
               exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
           }
@@ -160,11 +171,8 @@ class Crawler(seedUrl: String) {
 }
 
 object Crawler {
+
   def main(args: Array[String]) {
-
-//    var a = fetchDocumentFromURL("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en/studies/non-degree-courses/exchange-and-visiting-studies/programmes.html")
-//    println(extractText(a).length, extractText(a))
-
     val seed = args.headOption.getOrElse("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html")
     val result = new Crawler(seed).crawl()
 
@@ -173,22 +181,6 @@ object Crawler {
     println(s"Near duplicates: ${result.numNearDuplicates}")
     println(s"English pages: ${result.numEnglishPages}")
     println(s"Student frequency: ${result.studentFrequency}")
-
-//    var ls = linkContent.keys.toList zip linkContent.values.map(x => SimHash128.getCodeOfDocument(x, 5))
-//    println("Starting comparison")
-//    for (d1 <- ls; d2 <- ls) {
-//      if (d1._1 != d2._1 && SimHash128.compareCodes(d1._2, d2._2) > 120) {
-//        println(SimHash128.compareCodes(d1._2, d2._2), " ", d1._1, " ", d2._1)
-//      }
-//    }
-
-    //    val simhash = SimHash
-    //
-    //    val scores = linkContent.mapValues(x => simhash.getCodeOfDocument(x, 5))
-    //    println("Starting Score Calc")
-    //    var rank = for (d1 <- scores.values.toList.zipWithIndex; d2 <- scores.values.toList.zipWithIndex) yield (simhash.compareCodes(d1._1, d2._1), d1._2, d2._2)
-    //    println("Finished Score Calc")
-    //    println(rank.filter{case(a, d1, d2) => d1!=d2}.toList.sorted.reverse.take(5))
   }
 }
 
