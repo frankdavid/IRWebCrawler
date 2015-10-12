@@ -1,13 +1,12 @@
 import java.net.{ConnectException, SocketTimeoutException}
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListSet, LinkedBlockingQueue}
-import java.util.{Collections, Locale}
+import java.util.Locale
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.BitSet
+import scala.collection.mutable
 
 
 class Crawler(seedUrl: String) {
@@ -17,19 +16,18 @@ class Crawler(seedUrl: String) {
     FileLoader.loadFileFromPathOrJar("data/frequencies_en.dat")
   ))
 
-  val visitedUrls = new ConcurrentSkipListSet[String]()
-  val enqueuedUrls = new ConcurrentSkipListSet[String]()
-  val inProgress = new ConcurrentSkipListSet[String]()
-  val queue = new LinkedBlockingQueue[String]()
-  val exceptionCount = new ConcurrentHashMap[String, Int]()
-  val webPageHashes = new ConcurrentSkipListSet[String]()
-  // skip list only accepts Comparable instances, we cannot use that here
-  val simHashes = Collections.newSetFromMap(new ConcurrentHashMap[BitSet, java.lang.Boolean]())
+  val visitedUrls = new mutable.HashSet[String]()
+  val enqueuedUrls = new mutable.HashSet[String]()
+  val queue = new mutable.Queue[String]()
+  val exceptionCount = new mutable.HashMap[String, Int]()
+  val webPageHashes = new mutable.HashSet[String]()
+  val simHashes = new mutable.HashSet[BitSet]()
+  val md5Hasher = java.security.MessageDigest.getInstance("MD5")
 
-  val exactDuplicates = new AtomicInteger()
-  val nearDuplicates = new AtomicInteger()
-  val englishPages = new AtomicInteger()
-  val englishPagesContainingStudent = new AtomicInteger()
+  var exactDuplicates = 0
+  var nearDuplicates = 0
+  var englishPages = 0
+  var englishPagesContainingStudent = 0
 
   /** Example: http://idvm-infk-hofmann03.inf.ethz.ch */
   val crawlDomain = {
@@ -65,23 +63,68 @@ class Crawler(seedUrl: String) {
   }
 
   def crawl(): CrawlResult = {
-    queue.add(seedUrl)
+    queue.enqueue(seedUrl)
     enqueuedUrls += seedUrl
-    val threads = for (i <- 1 to 50) yield {
-      val t = new CrawlerThread(i)
-      t.start()
-      t
-    }
     val loggerThread = new LoggerThread()
     loggerThread.start()
-    threads.foreach(_.join())
+    doCrawl()
     loggerThread.interrupt()
     CrawlResult(
       numDistinctUrls = visitedUrls.size,
-      numExactDuplicates = exactDuplicates.get,
-      numNearDuplicates = nearDuplicates.get,
-      numEnglishPages = englishPages.get,
-      studentFrequency = englishPagesContainingStudent.get)
+      numExactDuplicates = exactDuplicates,
+      numNearDuplicates = nearDuplicates,
+      numEnglishPages = englishPages,
+      studentFrequency = englishPagesContainingStudent)
+  }
+
+  private def processPage(url: String, doc: Document): Unit = {
+    val text = Normalizer.normalize(extractText(doc))
+    // we need an instance of Comparable for ConcurrentSkipList, hence convert to String first
+    val isAlreadyPresent = !webPageHashes
+        .add(new String(md5Hasher.digest(text.getBytes(doc.charset().displayName()))))
+    if (isAlreadyPresent) {
+      exactDuplicates += 1
+    } else {
+      val currentSimHash = SimHash128.getCodeOfDocument(text)
+      if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
+        nearDuplicates += 1
+      }
+      simHashes.add(currentSimHash)
+    }
+    if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
+      englishPages += 1
+      if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) {
+        // matches student, STudenT, does not match students etc.
+        englishPagesContainingStudent += 1
+      }
+    }
+  }
+
+  private def doCrawl(): Unit = {
+    while (queue.nonEmpty) {
+      val url = queue.dequeue()
+      try {
+        val doc = fetchDocumentFromURL(url)
+        visitedUrls += url
+        processPage(url, doc)
+        for (url <- getURLsFromDoc(doc).diff(enqueuedUrls)) {
+          queue.enqueue(url)
+          enqueuedUrls += url
+        }
+      }
+      catch {
+        case e: org.jsoup.HttpStatusException =>
+          val message = "status" + e.getStatusCode
+          exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+        case _: ConnectException =>
+          queue.add(url)
+        case _: SocketTimeoutException =>
+          queue.add(url)
+        case e: Throwable =>
+          val message = e.getClass.getName + " " + e.getMessage
+          exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+      }
+    }
   }
 
   class LoggerThread extends Thread {
@@ -90,84 +133,11 @@ class Crawler(seedUrl: String) {
       try {
         while (!isInterrupted) {
           Thread.sleep(1500)
-          val remaining = queue.size + inProgress.size
+          val remaining = queue.size + 1 // + 1 for in progress
           println(s"Crawled: ${visitedUrls.size}, remaining: $remaining")
         }
       } catch {
         case _: InterruptedException => // NOOP
-      }
-    }
-  }
-
-  class CrawlerThread(id: Int) extends Thread {
-
-    val md5Hasher = java.security.MessageDigest.getInstance("MD5")
-
-    def processPage(url: String, doc: Document): Unit = {
-      val text = Normalizer.normalize(extractText(doc))
-      // we need an instance of Comparable for ConcurrentSkipList, hence convert to String first
-      webPageHashes.synchronized {
-        val isAlreadyPresent = !webPageHashes.add(new String(md5Hasher.digest(text.getBytes(doc.charset().displayName()))))
-        //      val isAlreadyPresent = !webPageHashes.add(text)
-        if (isAlreadyPresent) {
-          exactDuplicates.incrementAndGet()
-        } else {
-          val currentSimHash = SimHash128.getCodeOfDocument(text)
-          if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
-            nearDuplicates.incrementAndGet()
-          }
-          simHashes.add(currentSimHash)
-        }
-        if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
-          englishPages.incrementAndGet()
-          if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) {
-            // matches student, STudenT, does not match students etc.
-            englishPagesContainingStudent.incrementAndGet()
-          }
-        }
-      }
-    }
-
-    override def run(): Unit = {
-      while (true) {
-        val url = inProgress.synchronized {
-          val url = queue.poll()
-          if (url != null) {
-            inProgress.add(url)
-          }
-          url
-        }
-        if (url == null) {
-          if (inProgress.isEmpty) {
-            return
-          } else {
-            Thread.sleep(200)
-          }
-        } else {
-          try {
-            val doc = fetchDocumentFromURL(url)
-
-            visitedUrls += url
-            processPage(url, doc)
-            for (url <- getURLsFromDoc(doc).filter(x => !enqueuedUrls.contains(x))) {
-              queue.add(url)
-              enqueuedUrls += url
-            }
-          }
-          catch {
-            case e: org.jsoup.HttpStatusException =>
-              val message = "status" + e.getStatusCode
-              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-            case _: ConnectException =>
-              queue.add(url)
-            case _: SocketTimeoutException =>
-              queue.add(url)
-            case e: Throwable =>
-              val message = e.getClass.getName + " " + e.getMessage
-              exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
-          }
-          inProgress -= url
-        }
       }
     }
   }
