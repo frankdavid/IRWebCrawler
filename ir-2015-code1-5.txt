@@ -1,0 +1,16 @@
+Information Retrieval Assignment 1
+Group 5 (Dávid Frank, Ferenc Galkó, Zalán Borsos)
+
+Without login pages:
+Distinct urls: 4480
+Exact duplicates: 572
+Near duplicates: 43
+English pages: 2704
+Student frequency: 425
+
+With login pages:
+Distinct urls: 5780
+Exact duplicates: 1872
+Near duplicates: 43
+English pages: 4004
+Student frequency: 425
