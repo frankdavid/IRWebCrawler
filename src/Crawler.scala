@@ -21,9 +21,7 @@ class Crawler(seedUrl: String) {
   val enqueuedUrls = new ConcurrentSkipListSet[String]()
   val inProgress = new ConcurrentSkipListSet[String]()
   val queue = new LinkedBlockingQueue[String]()
-  val linkContent = new ConcurrentHashMap[String, String]()
   val exceptionCount = new ConcurrentHashMap[String, Int]()
-  val md5Hasher = java.security.MessageDigest.getInstance("MD5")
   val webPageHashes = new ConcurrentSkipListSet[String]()
   // skip list only accepts Comparable instances, we cannot use that here
   val simHashes = Collections.newSetFromMap(new ConcurrentHashMap[BitSet, java.lang.Boolean]())
@@ -66,28 +64,6 @@ class Crawler(seedUrl: String) {
     }
   }
 
-  def processPage(url: String, doc: Document): Unit = {
-    val text = Normalizer.normalize(extractText(doc))
-    linkContent(url) = text
-    // we need an instance of Comparable for ConcurrentSkipList, hence convert to String first
-    val isAlreadyPresent = !webPageHashes.add(new String(md5Hasher.digest(text.getBytes(doc.charset().displayName()))))
-    if (isAlreadyPresent) {
-      exactDuplicates.incrementAndGet()
-    } else {
-      val currentSimHash = SimHash128.getCodeOfDocument(text)
-      if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
-        nearDuplicates.incrementAndGet()
-      }
-      simHashes.add(currentSimHash)
-    }
-    if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
-      englishPages.incrementAndGet()
-      if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
-        englishPagesContainingStudent.incrementAndGet()
-      }
-    }
-  }
-
   def crawl(): CrawlResult = {
     queue.add(seedUrl)
     enqueuedUrls += seedUrl
@@ -124,6 +100,33 @@ class Crawler(seedUrl: String) {
   }
 
   class CrawlerThread(id: Int) extends Thread {
+
+    val md5Hasher = java.security.MessageDigest.getInstance("MD5")
+
+    def processPage(url: String, doc: Document): Unit = {
+      val text = Normalizer.normalize(extractText(doc))
+      // we need an instance of Comparable for ConcurrentSkipList, hence convert to String first
+      webPageHashes.synchronized {
+        val isAlreadyPresent = !webPageHashes.add(new String(md5Hasher.digest(text.getBytes(doc.charset().displayName()))))
+        //      val isAlreadyPresent = !webPageHashes.add(text)
+        if (isAlreadyPresent) {
+          exactDuplicates.incrementAndGet()
+        } else {
+          val currentSimHash = SimHash128.getCodeOfDocument(text)
+          if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
+            nearDuplicates.incrementAndGet()
+          }
+          simHashes.add(currentSimHash)
+        }
+        if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
+          englishPages.incrementAndGet()
+          if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) {
+            // matches student, STudenT, does not match students etc.
+            englishPagesContainingStudent.incrementAndGet()
+          }
+        }
+      }
+    }
 
     override def run(): Unit = {
       while (true) {
