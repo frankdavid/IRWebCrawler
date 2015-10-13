@@ -1,4 +1,5 @@
 import java.net.{ConnectException, SocketTimeoutException}
+import java.nio.charset.Charset
 import java.util.Locale
 
 import org.jsoup.Jsoup
@@ -19,7 +20,6 @@ class Crawler(seedUrl: String) {
   val visitedUrls = new mutable.HashSet[String]()
   val enqueuedUrls = new mutable.HashSet[String]()
   val queue = new mutable.Queue[String]()
-  val exceptionCount = new mutable.HashMap[String, Int]()
   val webPageHashes = new mutable.HashSet[String]()
   val simHashes = new mutable.HashSet[BitSet]()
   val md5Hasher = java.security.MessageDigest.getInstance("MD5")
@@ -62,6 +62,16 @@ class Crawler(seedUrl: String) {
     }
   }
 
+  private def md5Hash(string: String, charset: Charset) = {
+    val bytes = md5Hasher.digest(string.getBytes(charset))
+    val sb = new StringBuilder()
+    for (byte <- bytes) {
+      sb.append(Integer.toString((byte & 0xff) + 0x100, 16).substring(1))
+    }
+
+    sb.toString
+  }
+
   def crawl(): CrawlResult = {
     queue.enqueue(seedUrl)
     enqueuedUrls += seedUrl
@@ -79,9 +89,8 @@ class Crawler(seedUrl: String) {
 
   private def processPage(url: String, doc: Document): Unit = {
     val text = Normalizer.normalize(extractText(doc))
-    // we need an instance of Comparable for ConcurrentSkipList, hence convert to String first
-    val isAlreadyPresent = !webPageHashes
-        .add(new String(md5Hasher.digest(text.getBytes(doc.charset().displayName()))))
+    val hash = md5Hash(text, doc.charset())
+    val isAlreadyPresent = !webPageHashes.add(hash)
     if (isAlreadyPresent) {
       exactDuplicates += 1
     } else {
@@ -93,8 +102,7 @@ class Crawler(seedUrl: String) {
     }
     if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
       englishPages += 1
-      if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) {
-        // matches student, STudenT, does not match students etc.
+      if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
         englishPagesContainingStudent += 1
       }
     }
@@ -113,16 +121,12 @@ class Crawler(seedUrl: String) {
         }
       }
       catch {
-        case e: org.jsoup.HttpStatusException =>
-          val message = "status" + e.getStatusCode
-          exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+        case e: org.jsoup.HttpStatusException => // NOOP
         case _: ConnectException =>
-          queue.add(url)
+          queue.enqueue(url)
         case _: SocketTimeoutException =>
-          queue.add(url)
-        case e: Throwable =>
-          val message = e.getClass.getName + " " + e.getMessage
-          exceptionCount(message) = exceptionCount.getOrElse(message, 0) + 1
+          queue.enqueue(url)
+        case e: Throwable => // NOOP
       }
     }
   }
