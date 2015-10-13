@@ -99,11 +99,12 @@ class Crawler(seedUrl: String) {
         nearDuplicates += 1
       }
       simHashes.add(currentSimHash)
-    }
-    if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
-      englishPages += 1
-      if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
-        englishPagesContainingStudent += 1
+
+      if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
+        englishPages += 1
+        if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
+          englishPagesContainingStudent += 1
+        }
       }
     }
   }
