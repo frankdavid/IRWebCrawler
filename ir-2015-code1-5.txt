@@ -17,5 +17,11 @@ Student frequency: 367
 
 
 Methodology:
-We process the content of #contentMain and .textList elements. If the amount of text retrieved this way is not
-sufficient, we consider the whole textual content on the page.
+We process the content within elements matching #contentMain and .textList. If the amount of text retrieved this way is
+not sufficient, we consider the whole textual content on the page.
+
+By default the crawler disregards login pages. If you want them included, provide the `withlogin` flag after the url,
+like this:
+java -jar ir-2015-code1-5.jar http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html withlogin
+
+The application was compiled against scala version 2.11.7.

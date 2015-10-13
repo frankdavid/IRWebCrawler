@@ -10,7 +10,7 @@ import scala.collection.immutable.BitSet
 import scala.collection.mutable
 
 
-class Crawler(seedUrl: String) {
+class Crawler(seedUrl: String, includeLoginPages: Boolean = true) {
 
   val languageRecognizer = LanguageRecognizer.fromInputStreams(Seq(
     FileLoader.loadFileFromPathOrJar("data/frequencies_de.dat"),
@@ -31,7 +31,7 @@ class Crawler(seedUrl: String) {
 
   /** Example: http://idvm-infk-hofmann03.inf.ethz.ch */
   val crawlDomain = {
-    val regex = """^(.*:\/\/[^\/]+)\/.*""".r
+    val regex = """^(.*:\/\/[^\/]+).*""".r
     val regex(domain) = seedUrl
     domain
   }
@@ -41,7 +41,9 @@ class Crawler(seedUrl: String) {
         .map(_.replaceAll("#.*", ""))
         .map(_.replaceAll("\\?.*", ""))
         .filter(url =>
-          url.endsWith(".html") && url.startsWith(crawlDomain) && !url.matches(".*\\/login[a-f0-9]{4}\\.html"))
+          url.endsWith(".html") && url.startsWith(crawlDomain) &&
+              (includeLoginPages || !url.matches(".*\\/login[a-f0-9]{4}\\.html"))
+        )
         .toSet
   }
 
@@ -77,8 +79,11 @@ class Crawler(seedUrl: String) {
     enqueuedUrls += seedUrl
     val loggerThread = new LoggerThread()
     loggerThread.start()
-    doCrawl()
-    loggerThread.interrupt()
+    try {
+      doCrawl()
+    } finally {
+      loggerThread.interrupt()
+    }
     CrawlResult(
       numDistinctUrls = visitedUrls.size,
       numExactDuplicates = exactDuplicates,
@@ -152,13 +157,23 @@ object Crawler {
 
   def main(args: Array[String]) {
     val seed = args.headOption.getOrElse("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html")
-    val result = new Crawler(seed).crawl()
+    val includeLogin = (args.length > 1) && (args(1) == "withlogin")
+    if (includeLogin) {
+      println(s"Started crawling from $seed, including login pages.")
+    } else {
+      println(s"Started crawling from $seed, excluding login pages.")
+    }
+    try {
+      val result = new Crawler(seed, includeLogin).crawl()
+      println(s"Distinct urls: ${result.numDistinctUrls}")
+      println(s"Exact duplicates: ${result.numExactDuplicates}")
+      println(s"Near duplicates: ${result.numNearDuplicates}")
+      println(s"English pages: ${result.numEnglishPages}")
+      println(s"Student frequency: ${result.studentFrequency}")
+    } catch {
+      case _: Throwable => println("Crawling failed, please check the url and your connection.")
+    }
 
-    println(s"Distinct urls: ${result.numDistinctUrls}")
-    println(s"Exact duplicates: ${result.numExactDuplicates}")
-    println(s"Near duplicates: ${result.numNearDuplicates}")
-    println(s"English pages: ${result.numEnglishPages}")
-    println(s"Student frequency: ${result.studentFrequency}")
   }
 }
 
