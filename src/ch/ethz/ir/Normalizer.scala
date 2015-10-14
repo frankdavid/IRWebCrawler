@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 object Normalizer {
 
   def normalize(text: String): String = { 

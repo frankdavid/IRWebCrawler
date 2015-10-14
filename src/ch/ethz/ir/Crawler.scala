@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 import java.net.{ConnectException, SocketTimeoutException}
 import java.nio.charset.Charset
 import java.util.Locale

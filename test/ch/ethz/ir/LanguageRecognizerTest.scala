@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 import scala.io.Source
 
 object LanguageRecognizerTest {

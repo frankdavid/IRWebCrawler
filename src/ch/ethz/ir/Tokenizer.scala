@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 object Tokenizer {
 
   def tokenize (text: String) : List[String] =

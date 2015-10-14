@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 import java.io.File
 import java.util.Locale
 

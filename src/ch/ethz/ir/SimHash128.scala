@@ -1,3 +1,5 @@
+package ch.ethz.ir
+
 import scala.collection.immutable.BitSet
 
 object SimHash128 {
