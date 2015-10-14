@@ -12,7 +12,7 @@ import scala.collection.immutable.BitSet
 import scala.collection.mutable
 
 
-class Crawler(seedUrl: String, includeLoginPages: Boolean = true) {
+class Crawler(seedUrl: String) {
 
   val languageRecognizer = LanguageRecognizer.fromInputStreams(Seq(
     FileLoader.loadFileFromPathOrJar("data/frequencies_de.dat"),
@@ -42,10 +42,7 @@ class Crawler(seedUrl: String, includeLoginPages: Boolean = true) {
     urlList
         .map(_.replaceAll("#.*", ""))
         .map(_.replaceAll("\\?.*", ""))
-        .filter(url =>
-          url.endsWith(".html") && url.startsWith(crawlDomain) &&
-              (includeLoginPages || !url.matches(".*\\/login[a-f0-9]{4}\\.html"))
-        )
+        .filter(url => url.endsWith(".html") && url.startsWith(crawlDomain))
         .toSet
   }
 
@@ -104,15 +101,15 @@ class Crawler(seedUrl: String, includeLoginPages: Boolean = true) {
       val currentSimHash = SimHash128.getCodeOfDocument(text)
       if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
         nearDuplicates += 1
-      }
-      simHashes.add(currentSimHash)
-
-      if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
-        englishPages += 1
-        if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
-          englishPagesContainingStudent += 1
+      } else {
+        if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
+          englishPages += 1
+          if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
+            englishPagesContainingStudent += 1
+          }
         }
       }
+      simHashes.add(currentSimHash)
     }
   }
 
@@ -159,14 +156,9 @@ object Crawler {
 
   def main(args: Array[String]) {
     val seed = args.headOption.getOrElse("http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html")
-    val includeLogin = (args.length > 1) && (args(1) == "withlogin")
-    if (includeLogin) {
-      println(s"Started crawling from $seed, including login pages.")
-    } else {
-      println(s"Started crawling from $seed, excluding login pages.")
-    }
+    println(s"Started crawling from $seed.")
     try {
-      val result = new Crawler(seed, includeLogin).crawl()
+      val result = new Crawler(seed).crawl()
       println(s"Distinct urls: ${result.numDistinctUrls}")
       println(s"Exact duplicates: ${result.numExactDuplicates}")
       println(s"Near duplicates: ${result.numNearDuplicates}")

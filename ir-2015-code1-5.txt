@@ -1,14 +1,6 @@
 Information Retrieval Assignment 1
 Group 5 (Dávid Frank, Ferenc Galkó, Zalán Borsos)
 
-Without login pages:
-Distinct urls: 4480
-Exact duplicates: 556
-Near duplicates: 59
-English pages: 2283
-Student frequency: 369
-
-With login pages:
 Distinct urls: 5780
 Exact duplicates: 1872
 Near duplicates: 43
@@ -18,10 +10,6 @@ Student frequency: 367
 
 Methodology:
 We process the content within elements matching #contentMain and .textList. If the amount of text retrieved this way is
-not sufficient, we consider the whole textual content on the page.
-
-By default the crawler disregards login pages. If you want them included, provide the `withlogin` flag after the url,
-like this:
-java -jar ir-2015-code1-5.jar http://idvm-infk-hofmann03.inf.ethz.ch/eth/www.ethz.ch/en.html withlogin
+not sufficient (the length is <10 characters), we consider the whole textual content on the page.
 
 The application was compiled against scala version 2.11.7.
