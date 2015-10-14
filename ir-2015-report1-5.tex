@@ -1,0 +1,47 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\begin{document}
+\begin{center}
+
+Information Retrieval Assignment 1
+
+
+Group 5 (Dávid Frank, Ferenc Galkó, Zalán Borsos)
+
+\vspace{1cm}
+
+\begin{tabular}{l r}
+Distinct urls: & 5780\\
+Exact duplicates: & 1407\\
+Near duplicates: & 547\\
+English pages: & 2530\\
+Student frequency: & 2506\\
+\end{tabular}
+\end{center}
+
+\vspace{1cm}
+
+\textbf{Methodology}
+
+We distinguish between the entire textual content of the page (named \textit{full text}) and the content within the \texttt{\#content} element (named \textit{content}). If the amount of text of the \textit{content} retrieved this way is not sufficient (the length of the extracted text is $<10$ characters), we use the \textit{full text} as the \textit{content}.
+
+For the calculation of exact duplicates, English pages and student frequency, we use the \textit{full text}, for near duplicate detection we use the \textit{content}. We consider two documents as near duplicates if their \textit{similarity hashes} differ in 0 or 1 bit.
+
+
+In addition to the above statistics we have made the following observations:
+\begin{enumerate}
+\item
+There are 1300 login pages, which are all exact duplicates.
+\item
+The very high frequency of \textit{student} can be explained by the header which contains the expression \textit{Student portal} (except for a small number of pages).
+\end{enumerate}
+
+
+
+The application was compiled against scala version 2.11.7. If you have incompatibility issues, try to run the application using:
+
+\texttt{java -jar ir-2015-crawler-5.jar}
+
+\end{document}
