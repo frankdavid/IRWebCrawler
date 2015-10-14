@@ -55,11 +55,13 @@ class Crawler(seedUrl: String) {
     Jsoup.connect(url).timeout(5000).get()
   }
 
-  def extractText(doc: Document): String = {
-    if(doc.select("#contentMain, .textList").text.length > 10) {
-      doc.select("#contentMain, .textList").text
+  def extractText(doc: Document): (String, String) = {
+    val fullText = doc.text()
+    val content = doc.select("#content").text()
+    if(content.length > 10) {
+      (fullText, content)
     } else {
-      doc.text
+      (fullText, fullText)
     }
   }
 
@@ -92,19 +94,20 @@ class Crawler(seedUrl: String) {
   }
 
   private def processPage(url: String, doc: Document): Unit = {
-    val text = Normalizer.normalize(extractText(doc))
-    val hash = md5Hash(text, doc.charset())
+    val (full, content) = extractText(doc)
+    val normalizedContent = Normalizer.normalize(content)
+    val hash = md5Hash(full, doc.charset())
     val isAlreadyPresent = !webPageHashes.add(hash)
     if (isAlreadyPresent) {
       exactDuplicates += 1
     } else {
-      val currentSimHash = SimHash128.getCodeOfDocument(text)
+      val currentSimHash = SimHash128.getCodeOfDocument(normalizedContent)
       if (simHashes.exists(existingSimHash => SimHash128.hammingDistance(existingSimHash, currentSimHash) <= 1)) {
         nearDuplicates += 1
       } else {
-        if (languageRecognizer.recognize(text) == Locale.ENGLISH) {
+        if (languageRecognizer.recognize(full) == Locale.ENGLISH) {
           englishPages += 1
-          if (text.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
+          if (full.matches("(?i)(^|.*\\W)student(\\W.*|$)")) { // matches student, STudenT, does not match students etc.
             englishPagesContainingStudent += 1
           }
         }
